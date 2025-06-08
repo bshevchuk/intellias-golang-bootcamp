@@ -7,7 +7,8 @@ import (
 	"os"
 )
 
-const defaultRssUrl = "https://dou.ua/feed/"
+// const defaultRssUrl = "https://dou.ua/feed/"
+const defaultRssUrl = "https://news.ycombinator.com/rss"
 
 func main() {
 
