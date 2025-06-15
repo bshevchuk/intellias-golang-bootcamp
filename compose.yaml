@@ -1,0 +1,34 @@
+services:
+  db:
+    container_name: intellias-golang-bootcamp-db
+    image: postgres:17-alpine
+    restart: always
+    environment:
+      POSTGRES_USER: pguser
+      POSTGRES_PASSWORD: pgpassword
+      POSTGRES_DB: pgdb
+    ports:
+      - 5432:5432
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U pguser -d pgdb"]
+      interval: 10s
+      retries: 5
+      start_period: 30s
+      timeout: 10s
+  db_schema_migrations:
+    container_name: intellias-golang-bootcamp-db-migrations
+    image: migrate/migrate:4
+    depends_on:
+      db:
+        condition: service_healthy
+    command: |
+      -path=/migrations/
+      -database postgres://pguser:pgpassword@db:5432/pgdb?sslmode=disable
+      up
+    volumes:
+      - ./internal/database/migrations:/migrations
+
+volumes:
+  pgdata: {}
