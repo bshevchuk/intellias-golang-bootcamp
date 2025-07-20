@@ -3,11 +3,12 @@ package main
 import (
 	"context"
 	"fmt"
-	"github.com/bshevchuk/intellias-golang-bootcamp/internal/database"
 	"github.com/bshevchuk/intellias-golang-bootcamp/internal/downloader"
+	"github.com/bshevchuk/intellias-golang-bootcamp/internal/models"
 	"github.com/bshevchuk/intellias-golang-bootcamp/internal/parser"
+	"github.com/bshevchuk/intellias-golang-bootcamp/internal/repository"
 	"github.com/jackc/pgx/v5/pgxpool"
-	"log"
+	"log/slog"
 	"os"
 )
 
@@ -20,6 +21,10 @@ func main() {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
+	logger := slog.New(slog.NewTextHandler(os.Stdout, &slog.HandlerOptions{
+		AddSource: true,
+	}))
+
 	// Create database
 	dbpool, err := pgxpool.New(ctx, defaultDatabaseUrl)
 	if err != nil {
@@ -28,37 +33,41 @@ func main() {
 	}
 	defer dbpool.Close()
 
-	db := database.NewPostgres(dbpool)
-	log.Printf("Connecting to database %s", defaultDatabaseUrl)
+	itemRepository := repository.NewItemRepository(dbpool)
+	logger.Info("Connecting to database", slog.Any("databaseUrl", defaultDatabaseUrl))
 
 	// Delete all data in database to have "fresh" database (for development purpose only)
-	err = db.DeleteAll(ctx)
+	err = itemRepository.DeleteAll(ctx)
 	if err != nil {
-		fmt.Fprintf(os.Stderr, "Unable to delete all from db: %v\n", err)
+		logger.Error(err.Error())
 		os.Exit(2)
 	}
-	log.Println("Deleted all data in database")
+	logger.Info("Deleted all data in database")
 
 	// Download content
 	content, err := downloader.Download(defaultRssUrl)
 	if err != nil {
-		fmt.Printf("exit with error: %v", err)
+		logger.Error(err.Error())
 		os.Exit(1)
 	}
-	log.Printf("Downloaded %d bytes from %s", len(content), defaultRssUrl)
+	logger.Debug("Downloaded ", slog.Any("bytes", len(content)), slog.Any("url", defaultRssUrl))
 
 	// Parse content as RSS
 	rss, err := parser.ParseRss(content)
 	if err != nil {
-		fmt.Printf("exit with error: %v", err)
+		logger.Error(err.Error())
 		os.Exit(1)
 	}
-	log.Println("Parsed RSS")
+	logger.Info("Parsed RSS")
 
 	// Show RSS and save into database
 	fmt.Printf("%s\n", rss.Channel.Title)
 	for _, item := range rss.Channel.Items {
-		err := db.CreateItem(ctx, item.Title, item.Link, item.Description)
+		err := itemRepository.Create(ctx, models.Item{
+			Title:       item.Title,
+			Link:        item.Link,
+			Description: item.Description,
+		})
 		if err != nil {
 			fmt.Printf("error when creating item %s error: %v", item.Title, err)
 		}
@@ -68,5 +77,5 @@ func main() {
 		fmt.Println()
 	}
 
-	log.Println("Done")
+	logger.Info("Done")
 }

@@ -1,0 +1,20 @@
+### Create feed by URL
+POST http://localhost:3000/feed
+Content-Type: application/json
+
+{
+    "url": "https://news.ycombinator.com/rss"
+}
+
+### Delete feed
+DELETE http://localhost:3000/feed/1
+
+### Retrieve all feed
+GET http://localhost:3000/feed
+
+### Get feed by ID
+GET http://localhost:3000/feed/ID
+
+### Get feed news by ID
+GET http://localhost:3000/feed/ID/news
+
