@@ -3,9 +3,7 @@ package server
 import (
 	"encoding/json"
 	"errors"
-	"github.com/bshevchuk/intellias-golang-bootcamp/internal/downloader"
 	"github.com/bshevchuk/intellias-golang-bootcamp/internal/models"
-	"github.com/bshevchuk/intellias-golang-bootcamp/internal/parser"
 	"net/http"
 	"strconv"
 )
@@ -43,6 +41,20 @@ func (s server) createFeedHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// check that the URL is not added before
+	exist, err := s.feedRepository.GetByUrl(r.Context(), reqPayload.Url)
+	if err != nil {
+		if !errors.Is(err, models.ErrNoRecord) {
+			s.serverError(w, r, err)
+			return
+		}
+	}
+	if exist.ID != 0 {
+		s.logger.Info("The URL already exists.", "url", reqPayload.Url)
+		http.Error(w, http.StatusText(http.StatusConflict), http.StatusConflict)
+		return
+	}
+
 	feed := models.Feed{
 		Url: reqPayload.Url,
 	}
@@ -53,29 +65,7 @@ func (s server) createFeedHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// download items
-	// todo think to move this in another goroutine (for background)
-	content, err := downloader.Download(feed.Url)
-	if err != nil {
-		s.logger.Error(err.Error())
-	}
-
-	rss, err := parser.ParseRss(content)
-	if err != nil {
-		s.logger.Error(err.Error())
-	}
-
-	for _, item := range rss.Channel.Items {
-		err := s.itemRepository.Create(ctx, models.Item{
-			FeedID:      id,
-			Title:       item.Title,
-			Link:        item.Link,
-			Description: item.Description,
-		})
-		if err != nil {
-			s.logger.Error(err.Error())
-		}
-	}
+	s.worker.DownloadInBackground(id, reqPayload.Url)
 
 	resp := createRespPayload{
 		Id:  id,
