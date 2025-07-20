@@ -13,6 +13,7 @@ type FeedRepository interface {
 	Delete(ctx context.Context, id int) error
 	GetAll(ctx context.Context) ([]models.Feed, error)
 	GetById(ctx context.Context, id int) (models.Feed, error)
+	GetByUrl(ctx context.Context, url string) (models.Feed, error)
 }
 
 type FeedRepositoryImpl struct {
@@ -47,7 +48,7 @@ func (f FeedRepositoryImpl) Delete(ctx context.Context, id int) error {
 func (f FeedRepositoryImpl) GetById(ctx context.Context, id int) (models.Feed, error) {
 	var feed models.Feed
 	err := f.db.QueryRow(ctx,
-		`SELECT id,url FROM "feeds" WHERE id=$1`,
+		`SELECT "id","url" FROM "feeds" WHERE id=$1`,
 		id,
 	).Scan(&feed.ID, &feed.Url)
 	if err != nil {
@@ -63,7 +64,7 @@ func (f FeedRepositoryImpl) GetById(ctx context.Context, id int) (models.Feed, e
 func (f FeedRepositoryImpl) GetAll(ctx context.Context) ([]models.Feed, error) {
 	var feeds []models.Feed
 
-	rows, err := f.db.Query(ctx, `SELECT id,url FROM "feeds"`)
+	rows, err := f.db.Query(ctx, `SELECT "id","url" FROM "feeds"`)
 	if err != nil {
 		return nil, err
 	}
@@ -82,4 +83,20 @@ func (f FeedRepositoryImpl) GetAll(ctx context.Context) ([]models.Feed, error) {
 	}
 
 	return feeds, err
+}
+
+func (f FeedRepositoryImpl) GetByUrl(ctx context.Context, url string) (models.Feed, error) {
+	var feed models.Feed
+	err := f.db.QueryRow(ctx,
+		`SELECT "id","url" FROM "feeds" WHERE url=$1`,
+		url,
+	).Scan(&feed.ID, &feed.Url)
+	if err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			return feed, models.ErrNoRecord
+		}
+		return feed, err
+	}
+
+	return feed, err
 }

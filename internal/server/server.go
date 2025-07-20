@@ -10,13 +10,19 @@ type server struct {
 	itemRepository repository.ItemRepository
 	feedRepository repository.FeedRepository
 	logger         *slog.Logger
+	worker         backgroundWorker
 }
 
-func NewServer(itemRepository repository.ItemRepository, feedRepository repository.FeedRepository, logger *slog.Logger) *server {
+type backgroundWorker interface {
+	DownloadInBackground(feedId int, feedUrl string)
+}
+
+func NewServer(itemRepository repository.ItemRepository, feedRepository repository.FeedRepository, logger *slog.Logger, bw backgroundWorker) *server {
 	return &server{
 		itemRepository: itemRepository,
 		feedRepository: feedRepository,
 		logger:         logger,
+		worker:         bw,
 	}
 }
 
@@ -29,5 +35,9 @@ func (s server) Routes() http.Handler {
 	mux.HandleFunc("GET /feed/{id}", s.getFeedByIdHandler)
 	mux.HandleFunc("GET /feed/{id}/news", s.getFeedNewsHandler)
 
-	return mux
+	return s.recoverPanic(
+		s.logRequest(
+			mux,
+		),
+	)
 }
