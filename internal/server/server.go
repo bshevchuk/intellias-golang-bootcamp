@@ -35,5 +35,9 @@ func (s server) Routes() http.Handler {
 	mux.HandleFunc("GET /feed/{id}", s.getFeedByIdHandler)
 	mux.HandleFunc("GET /feed/{id}/news", s.getFeedNewsHandler)
 
-	return mux
+	return s.recoverPanic(
+		s.logRequest(
+			mux,
+		),
+	)
 }
