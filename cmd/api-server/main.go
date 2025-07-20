@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"github.com/bshevchuk/intellias-golang-bootcamp/internal/repository"
 	"github.com/bshevchuk/intellias-golang-bootcamp/internal/server"
@@ -10,6 +11,9 @@ import (
 	"log/slog"
 	"net/http"
 	"os"
+	"os/signal"
+	"syscall"
+	"time"
 )
 
 const defaultDatabaseUrl = "postgres://pguser:pgpassword@localhost:5432/pgdb?sslmode=disable"
@@ -40,9 +44,27 @@ func main() {
 	addr := fmt.Sprintf(":%d", port)
 	log.Printf("starting server on %s", addr)
 
-	err = http.ListenAndServe(addr, s.Routes())
-	if err != nil {
-		log.Fatal(err)
-		return
+	server := http.Server{
+		Addr:    addr,
+		Handler: s.Routes(),
 	}
+
+	go func() {
+		if err := server.ListenAndServe(); !errors.Is(err, http.ErrServerClosed) {
+			log.Fatal(err)
+		}
+		log.Println("Stopped serving new connections")
+	}()
+
+	sigChan := make(chan os.Signal, 1)
+	signal.Notify(sigChan, syscall.SIGINT, syscall.SIGTERM)
+	<-sigChan
+
+	shutdownCtx, shutdownRelease := context.WithTimeout(context.Background(), 10*time.Second)
+	defer shutdownRelease()
+
+	if err := server.Shutdown(shutdownCtx); err != nil {
+		log.Fatalf("HTTP close error: %v", err)
+	}
+	log.Println("Graceful shutdown complete")
 }
