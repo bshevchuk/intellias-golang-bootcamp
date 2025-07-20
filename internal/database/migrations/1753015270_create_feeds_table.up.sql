@@ -1,8 +1,7 @@
-CREATE TABLE "items" (
+CREATE TABLE "feeds"(
     "id" integer GENERATED ALWAYS AS IDENTITY,
-    "title" text,
-    "link" text,
-    "description" text,
+    "url" text,
     "createdAt" timestamp DEFAULT 'now()',
     PRIMARY KEY ("id")
-);
+)
+
