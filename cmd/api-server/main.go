@@ -77,6 +77,7 @@ func main() {
 
 	if err := srv.Shutdown(shutdownCtx); err != nil {
 		logger.Error(err.Error())
+		os.Exit(1)
 	}
 	logger.Info("Graceful shutdown complete")
 }
